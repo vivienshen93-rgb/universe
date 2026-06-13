@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>粒子宇宙 - Particle Universe</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { overflow: hidden; background: #000; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #fff; user-select: none; }
+
+#canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; }
+canvas { display: block; }
+
+#status-bar {
+  position: fixed; top: 16px; left: 16px; z-index: 10;
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+  padding: 8px 14px; font-size: 12px; font-weight: 500;
+  transition: opacity 0.3s;
+}
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot-gray { background: #666; }
+.dot-green { background: #4ade80; box-shadow: 0 0 8px rgba(74,222,128,0.6); }
+.dot-red { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,0.6); }
+#gesture-value { color: rgba(255,255,255,0.5); min-width: 28px; text-align: right; }
+
+#toolbar {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 10;
+  background: rgba(0,0,0,0.55); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 16px;
+  padding: 10px 16px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  max-width: 92vw; width: auto;
+  transition: opacity 0.4s, transform 0.4s;
+}
+#toolbar.hidden { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(20px); }
+
+.pattern-row {
+  display: flex; gap: 4px; flex-wrap: wrap; justify-content: center;
+}
+.pattern-btn {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px; padding: 6px 10px; cursor: pointer;
+  font-size: 11px; color: rgba(255,255,255,0.6); transition: all 0.2s;
+  display: flex; align-items: center; gap: 4px; white-space: nowrap;
+  font-family: inherit;
+}
+.pattern-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.pattern-btn.active { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.2); color: #fff; box-shadow: 0 0 12px rgba(255,255,255,0.05); }
+
+.control-row {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: center;
+  width: 100%;
+}
+.control-group { display: flex; align-items: center; gap: 8px; }
+.control-group label { font-size: 11px; color: rgba(255,255,255,0.4); }
+#hue-picker { width: 36px; height: 28px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; background: none; cursor: pointer; padding: 0; }
+#hue-picker::-webkit-color-swatch-wrapper { padding: 2px; }
+#hue-picker::-webkit-color-swatch { border: none; border-radius: 4px; }
+#size-slider { width: 80px; accent-color: rgba(255,255,255,0.6); cursor: pointer; }
+#gesture-slider { width: 80px; accent-color: rgba(255,255,255,0.6); cursor: pointer; }
+#gesture-slider::-webkit-slider-runnable-track { height: 3px; background: rgba(255,255,255,0.15); border-radius: 2px; }
+#size-slider::-webkit-slider-runnable-track { height: 3px; background: rgba(255,255,255,0.15); border-radius: 2px; }
+#gesture-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,0.6); margin-top: -4.5px; }
+#size-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,0.6); margin-top: -4.5px; }
+#gesture-fallback-label { font-size: 10px; color: rgba(255,255,255,0.3); }
+
+.icon-btn {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px; padding: 4px 8px; cursor: pointer;
+  font-size: 14px; color: rgba(255,255,255,0.5); transition: all 0.2s;
+  line-height: 1; font-family: inherit;
+}
+.icon-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+#camera-pip {
+  position: fixed; bottom: 100px; right: 16px; z-index: 10;
+  width: 160px; height: 120px; border-radius: 12px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.08);
+  opacity: 0; pointer-events: none; transition: opacity 0.4s;
+}
+#camera-pip.visible { opacity: 1; pointer-events: auto; }
+#camera-pip video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+#pip-toggle { font-size: 12px; }
+
+#show-ui-btn {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 10;
+  background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 20px;
+  padding: 6px 16px; cursor: pointer;
+  font-size: 12px; color: rgba(255,255,255,0.4); transition: opacity 0.3s;
+  font-family: inherit; display: none;
+}
+#show-ui-btn:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.08); }
+
+@media (max-width: 640px) {
+  #toolbar { padding: 8px 10px; bottom: 16px; border-radius: 14px; }
+  .pattern-btn { font-size: 10px; padding: 4px 7px; }
+  .control-group label { font-size: 10px; }
+  #size-slider { width: 60px; }
+  #status-bar { top: 10px; left: 10px; padding: 5px 10px; font-size: 10px; }
+  #camera-pip { width: 100px; height: 75px; bottom: 85px; right: 10px; }
+}
+</style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<div id="status-bar">
+  <span id="status-dot" class="status-dot dot-gray"></span>
+  <span id="status-text">摄像头...</span>
+  <span id="gesture-value">--</span>
+</div>
+
+<div id="camera-pip">
+  <video id="pip-video" autoplay playsinline></video>
+</div>
+
+<div id="toolbar">
+  <div class="pattern-row" id="pattern-row">
+    <button class="pattern-btn active" data-pattern="0">🌌 银河</button>
+    <button class="pattern-btn" data-pattern="1">🕳️ 黑洞</button>
+    <button class="pattern-btn" data-pattern="2">🌫️ 星云</button>
+    <button class="pattern-btn" data-pattern="3">✨ 星团</button>
+    <button class="pattern-btn" data-pattern="4">🪐 土星</button>
+    <button class="pattern-btn" data-pattern="5">❤️ 爱心</button>
+  </div>
+  <div class="control-row">
+    <div class="control-group">
+      <label>色相</label>
+      <input type="color" id="hue-picker" value="#ff6666">
+    </div>
+    <div class="control-group">
+      <label>大小</label>
+      <input type="range" id="size-slider" min="0.02" max="0.15" step="0.01" value="0.06">
+    </div>
+    <div class="control-group" id="gesture-fallback-group">
+      <label id="gesture-fallback-label">收缩</label>
+      <input type="range" id="gesture-slider" min="0" max="1" step="0.01" value="0">
+    </div>
+    <button class="icon-btn" id="pip-toggle" title="摄像头画中画">📷</button>
+    <button class="icon-btn" id="hide-btn" title="隐藏控件">👁️</button>
+    <button class="icon-btn" id="fullscreen-btn" title="全屏">⛶</button>
+    <button class="icon-btn" id="music-btn" title="播放/暂停">🎵</button>
+    <button class="icon-btn" id="prev-btn" title="上一首">⏮</button>
+    <button class="icon-btn" id="next-btn" title="下一首">⏭</button>
+    <span id="track-name" style="font-size:11px;color:rgba(255,255,255,0.45);max-width:130px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">Cornfield Chase</span>
+  </div>
+</div>
+
+<audio id="bgm" loop preload="none"></audio>
+
+<button id="show-ui-btn">✦ 显示控件</button>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.162.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.162.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ====== CONSTANTS ======
+const PARTICLE_COUNT = 20000;
+const PATTERN_NAMES = ['银河', '黑洞', '星云', '星团', '土星', '爱心'];
+let currentPattern = 0;
+let hueOffset = 0; // in degrees
+let particleSize = 0.06;
+let gestureValue = 1.0; // 0=fist, 1=open
+let smoothedLerp = 0; // 0=spread, 1=contracted
+let targetLerp = 0;
+let cameraStatus = 'waiting'; // waiting | working | error | denied
+let uiVisible = true;
+let pipVisible = false;
+let cameraFallback = false;
+function hslToRgb(h, s, l) {
+  h = ((h % 1) + 1) % 1;
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+  };
+  if (s === 0) return [l, l, l];
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  return [hue2rgb(p, q, h + 1/3), hue2rgb(p, q, h), hue2rgb(p, q, h - 1/3)];
+}
+function gaussianRandom() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+// ====== SPREAD STATE (open hand) ======
+function generateSpreadPositions(count) {
+  const p = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const r = 3 + Math.cbrt(Math.random()) * 15;
+    p[i*3] = r * Math.sin(phi) * Math.cos(theta);
+    p[i*3+1] = r * Math.cos(phi) * 0.6;
+    p[i*3+2] = r * Math.sin(phi) * Math.sin(theta);
+  }
+  return p;
+}
+function generateSpreadColors(count) {
+  const c = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const warmth = Math.random() * 0.08;
+    const bright = 0.7 + Math.random() * 0.3;
+    c[i*3] = 0.9 + warmth;
+    c[i*3+1] = 0.85 + warmth;
+    c[i*3+2] = bright;
+  }
+  return c;
+}
+
+// ====== PATTERN GENERATORS ======
+// Each returns { positions: Float32Array, colors: Float32Array }
+// positions are in [-1, 1] range before scaling; scaled inside each function
+
+function genGalaxy(count, hueOff) {
+  const p = new Float32Array(count * 3);
+  const c = new Float32Array(count * 3);
+  const arms = 3;
+  const coreR = 1.2;
+  const armOuter = 4.5;
+  const scatterOuter = 7.5;
+  const coreCount = Math.floor(count * 0.5);
+  const armCount = Math.floor(count * 0.35);
+  let idx = 0;
+  // Core: dense cluster, gaussian distribution
+  for (let i = 0; i < coreCount; i++) {
+    const r = Math.abs(gaussianRandom()) * coreR * 0.45;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    p[idx*3] = r * Math.sin(phi) * Math.cos(theta);
+    p[idx*3+1] = r * Math.cos(phi) * 0.3;
+    p[idx*3+2] = r * Math.sin(phi) * Math.sin(theta);
+    const t = Math.min(1, r / (coreR * 0.45));
+    const h = 0.08 + hueOff/360;
+    const s = 0.7 - t * 0.2;
+    const l = 0.8 - t * 0.3;
+    const rgb = hslToRgb(h, s, l);
+    c[idx*3] = rgb[0]; c[idx*3+1] = rgb[1]; c[idx*3+2] = rgb[2];
+    idx++;
+  }
+  // Spiral arms: decreasing density outward
+  for (let i = 0; i < armCount; i++) {
+    const arm = Math.floor(Math.random() * arms);
+    const r = coreR + Math.pow(Math.random(), 0.3) * (armOuter - coreR);
+    const armAngle = (arm / arms) * Math.PI * 2;
+    const twist = (r - coreR) * 1.8;
+    const armWidth = 0.12 + (r - coreR) * 0.05;
+    const theta = armAngle + twist + gaussianRandom() * armWidth;
+    const thick = gaussianRandom() * (0.04 + r * 0.008);
+    p[idx*3] = r * Math.cos(theta);
+    p[idx*3+1] = thick;
+    p[idx*3+2] = r * Math.sin(theta);
+    const t = (r - coreR) / (armOuter - coreR);
+    let h, s, l;
+    if (t < 0.2) {
+      h = 0.10 + hueOff/360; s = 0.7; l = 0.6;
+    } else if (t < 0.5) {
+      h = 0.55 + hueOff/360; s = 0.7; l = 0.5;
+    } else {
+      h = 0.75 + hueOff/360; s = 0.6; l = 0.3 + (1-t)*0.2;
+    }
+    const bright = 0.8 + Math.random() * 0.2;
+    const rgb = hslToRgb(h, s, l);
+    c[idx*3] = rgb[0]*bright; c[idx*3+1] = rgb[1]*bright; c[idx*3+2] = rgb[2]*bright;
+    idx++;
+  }
+  // Scattered: sparse, dim, random positions
+  for (let i = idx; i < count; i++) {
+    const r = armOuter + Math.pow(Math.random(), 0.5) * (scatterOuter - armOuter);
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    p[idx*3] = r * Math.sin(phi) * Math.cos(theta);
+    p[idx*3+1] = r * Math.cos(phi) * 0.3;
+    p[idx*3+2] = r * Math.sin(phi) * Math.sin(theta);
+    const h = 0.6 + hueOff/360;
+    const s = 0.3;
+    const l = 0.2 + Math.random() * 0.15;
+    const rgb = hslToRgb(h, s, l);
+    c[idx*3] = rgb[0]; c[idx*3+1] = rgb[1]; c[idx*3+2] = rgb[2];
+    idx++;
+  }
+  return { positions: p, colors: c };
+}
+
+function genBlackHole(count, hueOff) {
+  const p = new Float32Array(count * 3);
+  const c = new Float32Array(count * 3);
+  const darkR = 1.5;
+  const outerR = 5.0;
+  const scatterR = 6.5;
+
+  const mainCount = count;
+  const scatterCount = 0;
+  let idx = 0;
+
+  // Main disk: continuous gradient from bright ring → inner disk → outer disk
+  // r^0.5 keeps ring dense, outer disk still well-populated
+  for (let i = 0; i < mainCount; i++) {
+    const r = darkR + Math.pow(Math.random(), 0.5) * (outerR - darkR);
+    const angle = Math.random() * Math.PI * 2;
+    const thick = gaussianRandom() * (0.04 + (r - darkR) * 0.004);
+    const warp = Math.sin(angle * 3 + r * 2) * 0.015;
+    p[idx*3] = r * Math.cos(angle);
+    p[idx*3+1] = thick + warp * (r < 2.5 ? 1 : 0);
+    p[idx*3+2] = r * Math.sin(angle);
+
+    const norm = (r - darkR) / (outerR - darkR);
+    const h = 0.58 + hueOff/360 - norm * 0.53;
+    const s = 0.2 + norm * 0.6;
+    const l = 0.85 - norm * 0.25;
+    const rgb = hslToRgb(h, s, l);
+    c[idx*3] = rgb[0]; c[idx*3+1] = rgb[1]; c[idx*3+2] = rgb[2];
+    idx++;
+  }
+
+  // Scattered particles outside the main disk (with gap)
+  for (let i = 0; i < scatterCount; i++) {
+    const r = outerR + 1.5 + Math.pow(Math.random(), 0.3) * (scatterR - outerR - 1.5);
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    p[idx*3] = r * Math.sin(phi) * Math.cos(theta);
+    p[idx*3+1] = r * Math.cos(phi) * 0.04;
+    p[idx*3+2] = r * Math.sin(phi) * Math.sin(theta);
+
+    const h = 0.04 + hueOff/360 + Math.random() * 0.03;
+    const s = 0.5 + Math.random() * 0.3;
+    const l = 0.2 + Math.random() * 0.2;
+    const rgb = hslToRgb(h, s, l);
+    c[idx*3] = rgb[0]; c[idx*3+1] = rgb[1]; c[idx*3+2] = rgb[2];
+    idx++;
+  }
+  return { positions: p, colors: c };
+}
+
+function genNebula(count, hueOff) {
+  const p = new Float32Array(count * 3);
+  const c = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const cluster = Math.floor(Math.random() * 3);
+    const cx = (cluster - 1) * 2.5;
+    const cy = (Math.random() - 0.5) * 1.5;
+    const cz = (Math.random() - 0.5) * 1.5;
+    const spread = 1.2 + Math.random() * 1.0;
+    p[i*3] = cx + gaussianRandom() * spread;
+    p[i*3+1] = cy + gaussianRandom() * spread * 0.8;
+    p[i*3+2] = cz + gaussianRandom() * spread * 0.6;
+
+    const hueBase = [0.88, 0.55, 0.75][cluster];
+    const h = hueBase + (Math.random() - 0.5) * 0.15 + hueOff/360;
+    const s = 0.3 + Math.random() * 0.5;
+    const l = 0.3 + Math.random() * 0.4;
+    const rgb = hslToRgb(h, s, l);
+    c[i*3] = rgb[0]; c[i*3+1] = rgb[1]; c[i*3+2] = rgb[2];
+  }
+  return { positions: p, colors: c };
+}
+
+function genStarCluster(count, hueOff) {
+  const p = new Float32Array(count * 3);
+  const c = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const r = Math.abs(gaussianRandom()) * 2.5;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    p[i*3] = r * Math.sin(phi) * Math.cos(theta);
+    p[i*3+1] = r * Math.cos(phi) * 0.7;
+    p[i*3+2] = r * Math.sin(phi) * Math.sin(theta);
+
+    const t = Math.min(1, r / 4);
+    const h = 0.1 + hueOff/360 + (1 - t) * 0.05;
+    const s = 0.6 - t * 0.3;
+    const l = 0.5 + (1 - t) * 0.35;
+    const rgb = hslToRgb(h, s, l);
+    c[i*3] = rgb[0]; c[i*3+1] = rgb[1]; c[i*3+2] = rgb[2];
+  }
+  return { positions: p, colors: c };
+}
+
+function genSaturn(count, hueOff) {
+  const p = new Float32Array(count * 3);
+  const c = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    if (i < count * 0.8) {
+      // Planet body - more particles, brighter
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      const r = Math.cbrt(Math.random()) * 2.0;
+      p[i*3] = r * Math.sin(phi) * Math.cos(theta);
+      p[i*3+1] = r * Math.cos(phi) * 0.85;
+      p[i*3+2] = r * Math.sin(phi) * Math.sin(theta);
+
+      const t = r / 2.0;
+      const h = 0.08 + hueOff/360;
+      const s = 0.6 - t * 0.2;
+      const l = 0.35 + (1 - t) * 0.35;
+      const rgb = hslToRgb(h, s, l);
+      c[i*3] = rgb[0]; c[i*3+1] = rgb[1]; c[i*3+2] = rgb[2];
+    } else {
+      // Rings - elliptical orbit
+      const inner = 3.0, outer = 5.5;
+      const r = inner + Math.pow(Math.random(), 0.7) * (outer - inner);
+      const angle = Math.random() * Math.PI * 2;
+      const eccentricity = 0.2;
+      p[i*3] = r * Math.cos(angle);
+      p[i*3+1] = (Math.random() - 0.5) * 0.02;
+      p[i*3+2] = r * Math.sin(angle) * (1 - eccentricity);
+
+      const t = (r - inner) / (outer - inner);
+      const h = 0.08 + hueOff/360 + t * 0.1;
+      const s = 0.3 + t * 0.3;
+      const l = 0.25 + (1 - t) * 0.3;
+      const rgb = hslToRgb(h, s, l);
+      c[i*3] = rgb[0]; c[i*3+1] = rgb[1]; c[i*3+2] = rgb[2];
+    }
+  }
+  return { positions: p, colors: c };
+}
+
+function genHeart(count, hueOff) {
+  const p = new Float32Array(count * 3);
+  const c = new Float32Array(count * 3);
+  const outlineCount = Math.floor(count * 0.4);
+  const bodyCount = count - outlineCount;
+  // Body: filled center, smooth bottom
+  let accepted = 0;
+  while (accepted < bodyCount) {
+    const t = Math.random() * Math.PI * 2;
+    const hy = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+    // Gentle weight: bottom (hy=-17) = 0.35, top (hy=5) = 1.0
+    const weight = 0.35 + 0.65 * (hy + 17) / 22;
+    if (Math.random() > weight) continue;
+
+    const r = Math.pow(Math.random(), 0.5);
+    const hx = 16 * Math.pow(Math.sin(t), 3);
+    const scale = r * 0.28;
+    p[accepted*3] = hx * scale;
+    p[accepted*3+1] = hy * scale;
+    p[accepted*3+2] = (Math.random() - 0.5) * 0.6 * 0.28 * 4;
+
+    const depth = Math.abs(p[accepted*3+2]) / 1.2;
+    const h = 0.0 + hueOff/360;
+    const s = 0.6 + (1 - depth) * 0.3;
+    const l = 0.4 + depth * 0.3;
+    const rgb = hslToRgb(h, s, l);
+    c[accepted*3] = rgb[0];
+    c[accepted*3+1] = rgb[1];
+    c[accepted*3+2] = rgb[2];
+    accepted++;
+  }
+  // Outline: 3D edge around the surface
+  for (let i = 0; i < outlineCount; i++) {
+    const idx = bodyCount + i;
+    const t = Math.random() * Math.PI * 2;
+    const hx = 16 * Math.pow(Math.sin(t), 3);
+    const hy = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+    const scale = 0.28;
+    p[idx*3] = hx * scale;
+    p[idx*3+1] = hy * scale;
+    p[idx*3+2] = (Math.random() - 0.5) * 0.25;
+
+    const h = 0.0 + hueOff/360;
+    const s = 0.9;
+    const l = 0.4 + Math.abs(p[idx*3+2]) * 0.6;
+    const rgb = hslToRgb(h, s, l);
+    c[idx*3] = rgb[0]; c[idx*3+1] = rgb[1]; c[idx*3+2] = rgb[2];
+  }
+  return { positions: p, colors: c };
+}
+
+const patternGenerators = [genGalaxy, genBlackHole, genNebula, genStarCluster, genSaturn, genHeart];
+
+// ====== THREE.JS SETUP ======
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(0, 0.5, 10);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 1);
+container.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.2;
+controls.minDistance = 3;
+controls.maxDistance = 60;
+controls.target.set(0, 0, 0);
+
+// ====== PARTICLE TEXTURE (radial gradient glow) ======
+function createParticleTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gradient.addColorStop(0, 'rgba(255,255,255,1)');
+  gradient.addColorStop(0.2, 'rgba(255,255,255,0.85)');
+  gradient.addColorStop(0.5, 'rgba(255,255,255,0.4)');
+  gradient.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(canvas);
+}
+const particleTexture = createParticleTexture();
+
+// ====== PARTICLE SYSTEM ======
+const spreadPos = generateSpreadPositions(PARTICLE_COUNT);
+const spreadCol = generateSpreadColors(PARTICLE_COUNT);
+
+const initialPattern = patternGenerators[0](PARTICLE_COUNT, 0);
+const contractedPos = new Float32Array(initialPattern.positions);
+const contractedCol = new Float32Array(initialPattern.colors);
+const targetPos = new Float32Array(initialPattern.positions);
+const targetCol = new Float32Array(initialPattern.colors);
+
+const currentPos = new Float32Array(PARTICLE_COUNT * 3);
+const currentCol = new Float32Array(PARTICLE_COUNT * 3);
+
+const geometry = new THREE.BufferGeometry();
+geometry.setAttribute('position', new THREE.BufferAttribute(currentPos, 3));
+geometry.setAttribute('color', new THREE.BufferAttribute(currentCol, 3));
+
+const material = new THREE.PointsMaterial({
+  size: particleSize,
+  map: particleTexture,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  transparent: true,
+  vertexColors: true,
+  opacity: 0.95,
+  sizeAttenuation: true,
+});
+
+const points = new THREE.Points(geometry, material);
+scene.add(points);
+
+// ====== MEDIAPIPE HANDS (classic API) ======
+// Uses @mediapipe/hands + @mediapipe/camera_utils loaded via script tags
+let handsInstance = null;
+let mediaPipeReady = false;
+const video = document.createElement('video');
+video.setAttribute('playsinline', '');
+video.setAttribute('autoplay', '');
+video.style.display = 'none';
+document.body.appendChild(video);
+
+const pipVideo = document.getElementById('pip-video');
+
+async function initCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+    });
+    video.srcObject = stream;
+    await video.play();
+    pipVideo.srcObject = stream;
+    await pipVideo.play();
+    cameraStatus = 'working';
+    updateStatusUI();
+    return true;
+  } catch (e) {
+    if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+      cameraStatus = 'denied';
+    } else {
+      cameraStatus = 'error';
+    }
+    updateStatusUI();
+    return false;
+  }
+}
+
+async function initMediaPipe() {
+  try {
+    handsInstance = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    handsInstance.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    handsInstance.onResults((results) => {
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const lm = results.multiHandLandmarks[0];
+        const dist = Math.sqrt(
+          (lm[4].x - lm[8].x)**2 + (lm[4].y - lm[8].y)**2 + (lm[4].z - lm[8].z)**2
+        );
+
+        // Detect fist: middle(12), ring(16), pinky(20) curled (tip below MCP in y)
+        const fist = lm[12].y > lm[9].y && lm[16].y > lm[13].y && lm[20].y > lm[17].y;
+        // Index extended: tip(8) above MCP(5)
+        const idxUp = lm[8].y < lm[5].y;
+
+        if (orbitMode) {
+          // ----- ORBIT MODE active -----
+          // Freeze particles at entry state
+          targetLerp = frozenLerp;
+          if (idxUp) {
+            // Track hand center (landmark 9) for orbit
+            lastHandX = lm[9].x;
+            lastHandY = lm[9].y;
+          } else {
+            // Exit orbit → force full contraction, no scatter
+            orbitMode = false;
+            indexExtendTimer = 0;
+            controls.autoRotate = true;
+            targetLerp = 1;
+            smoothedLerp = 1;
+            gestureValue = 0;
+            gestureSmooth = 0;
+            document.getElementById('gesture-slider').value = '1';
+            document.getElementById('gesture-value').textContent = '0';
+          }
+        } else {
+          // ----- NORMAL MODE -----
+          if (fist && idxUp) {
+            indexExtendTimer++;
+            if (indexExtendTimer > 120) {
+              orbitMode = true;
+              indexExtendTimer = 0;
+              frozenLerp = smoothedLerp; // freeze current particle state
+              controls.autoRotate = false;
+              // Track hand center (landmark 9) for orbit
+              lastHandX = lm[9].x;
+              lastHandY = lm[9].y;
+              prevHandX = lm[9].x;
+              prevHandY = lm[9].y;
+              document.getElementById('gesture-value').textContent = 'ORB';
+            }
+            // Don't change particle state during timer countdown
+          } else {
+            indexExtendTimer = 0;
+            // Particle control: thumb-index distance (original)
+            const gesture = Math.min(1, Math.max(0, (dist - 0.04) / 0.3));
+            gestureSmooth += (gesture - gestureSmooth) * 0.5;
+            gestureValue = gestureSmooth;
+            const lerpVal = 1 - gestureValue;
+            targetLerp = lerpVal;
+            document.getElementById('gesture-value').textContent = (gestureValue * 100).toFixed(0);
+            document.getElementById('gesture-slider').value = lerpVal.toFixed(2);
+          }
+        }
+        noHandTimer = 0;
+      } else {
+        if (orbitMode) {
+          orbitMode = false;
+          controls.autoRotate = true;
+          targetLerp = 1;
+          smoothedLerp = 1;
+          gestureValue = 0;
+          gestureSmooth = 0;
+          document.getElementById('gesture-slider').value = '1';
+          document.getElementById('gesture-value').textContent = '0';
+        }
+        indexExtendTimer = 0;
+      }
+    });
+
+    mediaPipeReady = true;
+    return true;
+  } catch (e) {
+    console.warn('MediaPipe init failed:', e);
+    return false;
+  }
+}
+
+function initCameraLoop() {
+  if (!mediaPipeReady || cameraStatus !== 'working' || !video.readyState) {
+    requestAnimationFrame(initCameraLoop);
+    return;
+  }
+  // Manual detection loop - no Camera utility (avoid 2nd getUserMedia)
+  async function detectLoop() {
+    if (handsInstance && video.readyState >= 2) {
+      try {
+        await handsInstance.send({ image: video });
+      } catch (e) {
+        // frame skip
+      }
+    }
+    requestAnimationFrame(detectLoop);
+  }
+  detectLoop();
+  // No-hand indicator
+  setInterval(() => {
+    noHandTimer++;
+    if (noHandTimer > 60) {
+      document.getElementById('gesture-value').textContent = '--';
+    }
+  }, 100);
+}
+
+let noHandTimer = 0;
+let gestureSmooth = 1.0;
+// Index-extend orbit mode
+let orbitMode = false;
+let indexExtendTimer = 0;
+let frozenLerp = 0;
+let lastHandX = 0.5, lastHandY = 0.5;
+let prevHandX = 0.5, prevHandY = 0.5;
+const orbSph = new THREE.Spherical();
+const orbVec = new THREE.Vector3();
+// Black hole distortion effect
+const mouseVec = new THREE.Vector2();
+const bhRaycaster = new THREE.Raycaster();
+const bhPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const bhHit = new THREE.Vector3();
+// Overhead view for galaxy/black hole
+let overheadActive = false;
+const ovSph = new THREE.Spherical();
+const ovVec = new THREE.Vector3();
+
+function showFallbackControls() {
+  cameraFallback = true;
+}
+
+function updateStatusUI() {
+  const dot = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  dot.className = 'status-dot';
+  if (cameraStatus === 'working') {
+    dot.classList.add('dot-green');
+    text.textContent = '摄像头工作中';
+  } else if (cameraStatus === 'error' || cameraStatus === 'denied') {
+    dot.classList.add('dot-red');
+    text.textContent = cameraStatus === 'denied' ? '摄像头被拒绝' : '摄像头错误';
+  } else {
+    dot.classList.add('dot-gray');
+    text.textContent = '摄像头连接中...';
+  }
+}
+
+// ====== PATTERN SWITCHING ======
+function setPattern(index) {
+  currentPattern = index;
+  const result = patternGenerators[index](PARTICLE_COUNT, hueOffset);
+  targetPos.set(result.positions);
+  targetCol.set(result.colors);
+  document.querySelectorAll('.pattern-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', i === index);
+  });
+}
+
+// ====== HUE ======
+function applyHue(newDegrees) {
+  const deltaDeg = newDegrees - hueOffset;
+  hueOffset = newDegrees;
+  if (Math.abs(deltaDeg) < 0.5) return;
+
+  const tempColor = new THREE.Color();
+  const hsl = { h: 0, s: 0, l: 0 };
+  const deltaH = deltaDeg / 360;
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const idx = i * 3;
+    tempColor.setRGB(targetCol[idx], targetCol[idx+1], targetCol[idx+2]);
+    tempColor.getHSL(hsl);
+    const newH = ((hsl.h + deltaH) % 1 + 1) % 1;
+    tempColor.setHSL(newH, hsl.s, hsl.l);
+    targetCol[idx] = tempColor.r;
+    targetCol[idx+1] = tempColor.g;
+    targetCol[idx+2] = tempColor.b;
+  }
+}
+
+// ====== UI EVENTS ======
+document.querySelectorAll('.pattern-btn').forEach(btn => {
+  btn.addEventListener('click', () => setPattern(parseInt(btn.dataset.pattern)));
+});
+
+document.getElementById('hue-picker').addEventListener('input', (e) => {
+  const hex = e.target.value;
+  const r = parseInt(hex.slice(1,3), 16) / 255;
+  const g = parseInt(hex.slice(3,5), 16) / 255;
+  const b = parseInt(hex.slice(5,7), 16) / 255;
+  const color = new THREE.Color(r, g, b);
+  const hsl = { h: 0, s: 0, l: 0 };
+  color.getHSL(hsl);
+  applyHue(hsl.h * 360);
+});
+
+document.getElementById('size-slider').addEventListener('input', (e) => {
+  particleSize = parseFloat(e.target.value);
+  material.size = particleSize;
+});
+
+document.getElementById('gesture-slider').addEventListener('input', (e) => {
+  targetLerp = parseFloat(e.target.value);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+    const slider = document.getElementById('gesture-slider');
+    slider.value = Math.min(1, parseFloat(slider.value) + 0.05);
+    targetLerp = parseFloat(slider.value);
+    e.preventDefault();
+  } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+    const slider = document.getElementById('gesture-slider');
+    slider.value = Math.max(0, parseFloat(slider.value) - 0.05);
+    targetLerp = parseFloat(slider.value);
+    e.preventDefault();
+  } else if (e.key === 'h' || e.key === 'H') {
+    uiVisible = !uiVisible;
+    document.getElementById('toolbar').classList.toggle('hidden', !uiVisible);
+    document.getElementById('show-ui-btn').style.display = uiVisible ? 'none' : 'block';
+    document.getElementById('status-bar').style.opacity = uiVisible ? 1 : 0;
+  }
+});
+
+document.getElementById('hide-btn').addEventListener('click', () => {
+  uiVisible = !uiVisible;
+  document.getElementById('toolbar').classList.toggle('hidden', !uiVisible);
+  document.getElementById('show-ui-btn').style.display = uiVisible ? 'none' : 'block';
+  document.getElementById('status-bar').style.opacity = uiVisible ? 1 : 0;
+});
+
+document.getElementById('show-ui-btn').addEventListener('click', () => {
+  uiVisible = true;
+  document.getElementById('toolbar').classList.remove('hidden');
+  document.getElementById('show-ui-btn').style.display = 'none';
+  document.getElementById('status-bar').style.opacity = 1;
+});
+
+document.getElementById('fullscreen-btn').addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+});
+
+// Background music control - playlist
+let musicPlaying = false;
+let currentTrack = 0;
+const musicTracks = [
+  { name: 'Cornfield Chase', file: 'music interstellar/02 Cornfield Chase.mp3' },
+  { name: 'Day One',         file: 'music interstellar/04 Day One.mp3' },
+  { name: 'Stay',            file: 'music interstellar/05 Stay.mp3' },
+  { name: 'S.T.A.Y.',        file: 'music interstellar/15 S.T.A.Y..mp3' },
+];
+const bgm = document.getElementById('bgm');
+const trackLabel = document.getElementById('track-name');
+
+function loadTrack(index) {
+  currentTrack = ((index % musicTracks.length) + musicTracks.length) % musicTracks.length;
+  bgm.src = musicTracks[currentTrack].file;
+  bgm.load();
+  trackLabel.textContent = musicTracks[currentTrack].name;
+  if (musicPlaying) bgm.play();
+}
+
+document.getElementById('music-btn').addEventListener('click', () => {
+  if (!musicPlaying) {
+    if (!bgm.src) loadTrack(0);
+    bgm.play().then(() => {
+      musicPlaying = true;
+      document.getElementById('music-btn').textContent = '🔊';
+    }).catch(() => {
+      document.getElementById('music-btn').textContent = '❌';
+    });
+  } else {
+    bgm.pause();
+    musicPlaying = false;
+    document.getElementById('music-btn').textContent = '🎵';
+  }
+});
+
+document.getElementById('prev-btn').addEventListener('click', () => {
+  loadTrack(currentTrack - 1);
+  if (!musicPlaying) {
+    musicPlaying = true;
+    document.getElementById('music-btn').textContent = '🔊';
+  }
+});
+
+document.getElementById('next-btn').addEventListener('click', () => {
+  loadTrack(currentTrack + 1);
+  if (!musicPlaying) {
+    musicPlaying = true;
+    document.getElementById('music-btn').textContent = '🔊';
+  }
+});
+
+document.getElementById('pip-toggle').addEventListener('click', () => {
+  pipVisible = !pipVisible;
+  document.getElementById('camera-pip').classList.toggle('visible', pipVisible);
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Black hole mouse distortion
+document.addEventListener('mousemove', (e) => {
+  mouseVec.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouseVec.y = -(e.clientY / window.innerHeight) * 2 + 1;
+});
+
+// ====== ANIMATION LOOP ======
+function animate() {
+  requestAnimationFrame(animate);
+
+  // Smooth gesture lerp
+  smoothedLerp += (targetLerp - smoothedLerp) * 0.1;
+
+  // Pattern transition: lerp contracted toward target
+  const tranSpeed = 0.08;
+  for (let i = 0; i < PARTICLE_COUNT * 3; i++) {
+    contractedPos[i] += (targetPos[i] - contractedPos[i]) * tranSpeed;
+    contractedCol[i] += (targetCol[i] - contractedCol[i]) * tranSpeed;
+  }
+
+  // Final lerp between spread and contracted
+  const l = smoothedLerp;
+  for (let i = 0; i < PARTICLE_COUNT * 3; i++) {
+    currentPos[i] = spreadPos[i] + (contractedPos[i] - spreadPos[i]) * l;
+    currentCol[i] = spreadCol[i] + (contractedCol[i] - spreadCol[i]) * l;
+  }
+  // Shift patterns upward when contracted
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    currentPos[i*3+1] += l * 1.0;
+  }
+
+  geometry.attributes.position.needsUpdate = true;
+  geometry.attributes.color.needsUpdate = true;
+
+  // Orbit mode: whole hand movement controls camera
+  if (orbitMode) {
+    const dx = (lastHandX - prevHandX) * 5;
+    const dy = (lastHandY - prevHandY) * 5;
+    prevHandX = lastHandX;
+    prevHandY = lastHandY;
+    orbVec.copy(camera.position).sub(controls.target);
+    orbSph.setFromVector3(orbVec);
+    orbSph.theta -= dx;
+    orbSph.phi = Math.max(0.05, Math.min(Math.PI - 0.05, orbSph.phi - dy));
+    camera.position.copy(controls.target).add(orbVec.setFromSpherical(orbSph));
+    camera.lookAt(controls.target);
+  }
+
+  // Overhead view when contracted: galaxy(0) or black hole(1)
+  const shouldOverhead = smoothedLerp > 0.92 && !orbitMode && (currentPattern === 0 || currentPattern === 1);
+  if (shouldOverhead && !overheadActive) {
+    overheadActive = true;
+  }
+  if (!shouldOverhead && overheadActive) {
+    overheadActive = false;
+  }
+  if (overheadActive) {
+    ovVec.copy(camera.position).sub(controls.target);
+    ovSph.setFromVector3(ovVec);
+    const targetPhi = 1.0;
+    ovSph.phi += (targetPhi - ovSph.phi) * 0.03;
+    camera.position.copy(controls.target).add(ovVec.setFromSpherical(ovSph));
+    camera.lookAt(controls.target);
+  }
+
+  // Black hole gravitational distortion
+  if (currentPattern === 1 && smoothedLerp > 0.8) {
+    bhRaycaster.setFromCamera(mouseVec, camera);
+    if (bhRaycaster.ray.intersectPlane(bhPlane, bhHit)) {
+      const cx = bhHit.x, cz = bhHit.z;
+      const radius = 2.0;
+      const strength = 0.25;
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const px = currentPos[i*3], pz = currentPos[i*3+2];
+        const dx = px - cx, dz = pz - cz;
+        const distSq = dx*dx + dz*dz;
+        if (distSq < radius * radius && distSq > 0.01) {
+          const dist = Math.sqrt(distSq);
+          const falloff = 1 - dist / radius;
+          // Stronger distortion near black hole center, weaker at edges
+          const centerDist = Math.sqrt(px*px + pz*pz);
+          const centerMod = Math.max(0, 1 - (centerDist - 1.5) / 2.5);
+          const push = strength * falloff * falloff * (0.3 + 0.7 * centerMod);
+          currentPos[i*3] += dx / dist * push;
+          currentPos[i*3+2] += dz / dist * push;
+          const warpY = Math.sin(dist * 5) * falloff * 0.07 * centerMod;
+          currentPos[i*3+1] += warpY;
+        }
+      }
+    }
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ====== INIT ======
+async function init() {
+  updateStatusUI();
+
+  // Start camera and MediaPipe in parallel
+  const mpPromise = initMediaPipe();
+  const camPromise = initCamera();
+
+  await Promise.all([mpPromise, camPromise]);
+
+  if (cameraStatus === 'working' && mediaPipeReady) {
+    initCameraLoop();
+  } else if (cameraStatus !== 'working') {
+    // Camera failed/denied — show fallback slider
+    showFallbackControls();
+  } else if (!mediaPipeReady) {
+    // Camera works but MediaPipe failed — still show fallback
+    showFallbackControls();
+  }
+
+  animate();
+}
+
+init();
+</script>
+</body>
+</html>
